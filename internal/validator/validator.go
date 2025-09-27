@@ -1,3 +1,5 @@
+// Filename: /internal/validator/validator.go
+// Define a package for data validation utilities.
 package validator
 
 import (

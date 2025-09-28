@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS menu_sales (
     menu_id INT NOT NULL,
     sale_id INT NOT NULL,
     quantity INT NOT NULL,
-    price NUMERIC(10, 2) NOT NULL,
+    unit_price NUMERIC(10, 2) NOT NULL,
     last_modified_by VARCHAR(100) NOT NULL,
     FOREIGN KEY (menu_id) REFERENCES menu(id) ON DELETE CASCADE,
     FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,

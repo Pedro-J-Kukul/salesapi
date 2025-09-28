@@ -1,3 +1,5 @@
+-- Migration: Create sales table
+-- File: migrations/000002_sales.up.sql
 CREATE TABLE sales (
     id SERIAL PRIMARY KEY,
     cashier_name VARCHAR(255) NOT NULL,

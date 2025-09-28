@@ -1,4 +1,5 @@
 -- Table for the menu and sales relationship using postgresql
+-- File: migrations/000003_menusales.up.sql
 CREATE TABLE IF NOT EXISTS menu_sales (
     id SERIAL PRIMARY KEY,
     menu_id INT NOT NULL,

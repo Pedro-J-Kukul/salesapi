@@ -61,3 +61,21 @@ migration/fix:
 		echo "No dirty migration found"; \
 	fi
 	@rm -f /tmp/migrate_version
+
+#########################################
+# for interacting with the api
+#########################################
+
+# run the api server
+.PHONY: api/run
+api/run:
+	@echo "Running the API server..."
+	@go run ./cmd/api \
+		-db-dsn="${DB_DSN}" \
+		-port=$(PORT) \
+		-env=$(ENV) \
+		-db-dsn=$(DB_DSN) \
+		-cors-trusted-origins="$(CORS_TRUSTED_ORIGINS)\
+		-rate-limiter-enabled=$(RATE_LIMITER_ENABLED) \
+		-rate-limiter-rps=$(RATE_LIMITER_RPS) \
+		-rate-limiter-burst=$(RATE_LIMITER_BURST)"

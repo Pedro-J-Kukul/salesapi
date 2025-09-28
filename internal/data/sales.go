@@ -11,7 +11,7 @@ import (
 
 // Sale struct represents the sale record for the items sold
 type Sale struct {
-	ID        int        `json:"id"`
+	ID        int64      `json:"id"`
 	Cashier   string     `json:"cashier"`
 	Total     float32    `json:"total"`
 	CashPaid  float32    `json:"cash_paid"`
@@ -22,10 +22,10 @@ type Sale struct {
 
 // SaleItem struct represents an item in a sale
 type SaleItem struct {
-	ID             int     `json:"id"`
-	MenuID         int     `json:"menu_id"`
-	SaleID         int     `json:"sale_id"`
-	Quantity       int     `json:"quantity"`
+	ID             int64   `json:"id"`
+	MenuID         int64   `json:"menu_id"`
+	SaleID         int64   `json:"sale_id"`
+	Quantity       int64   `json:"quantity"`
 	UnitPrice      float32 `json:"unit_price"`
 	LastModifiedBy string  `json:"last_modified_by"`
 	CreatedAt      string  `json:"created_at"`
@@ -41,8 +41,8 @@ type CreateSaleRequest struct {
 
 // CreateSaleItem struct represents an item in the create sale request
 type CreateSaleItem struct {
-	MenuID   int `json:"menu_id"`
-	Quantity int `json:"quantity"`
+	MenuID   int64 `json:"menu_id"`
+	Quantity int64 `json:"quantity"`
 }
 
 // ValidateSale checks the fields of the Sale struct for validity
@@ -96,7 +96,7 @@ func (m *SalesModel) Insert(req *CreateSaleRequest) (*Sale, error) {
 	var totalAmount float32
 
 	// Extract menu IDs from the request
-	menuIDs := make([]int, 0, len(req.Items))
+	menuIDs := make([]int64, 0, len(req.Items))
 	for _, item := range req.Items {
 		menuIDs = append(menuIDs, item.MenuID)
 	}
@@ -110,7 +110,7 @@ func (m *SalesModel) Insert(req *CreateSaleRequest) (*Sale, error) {
 	defer rows.Close()
 
 	// Create a map to hold menu items for easy lookup
-	menuItems := make(map[int]*Menu)
+	menuItems := make(map[int64]*Menu)
 	for rows.Next() {
 		var menu Menu
 		// scan into menu
@@ -204,7 +204,7 @@ func (m *SalesModel) Insert(req *CreateSaleRequest) (*Sale, error) {
 }
 
 // Delete removes a sale and all its associated items (cascade delete handles this)
-func (s *SalesModel) Delete(id int) error {
+func (s *SalesModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 type Menu struct {
-	ID             int     `json:"id"`
+	ID             int64   `json:"id"`
 	Name           string  `json:"name"`
 	Price          float32 `json:"price"`
 	CreatedAt      string  `json:"created_at"`
@@ -19,7 +19,7 @@ type Menu struct {
 }
 
 // Validate checks the fields of the Menu struct for validity.
-func Validate(v *validator.Validator, m *Menu) {
+func ValidateMenu(v *validator.Validator, m *Menu) {
 	v.Check(m.Name != "", "name", "must be provided")
 	v.Check(len(m.Name) <= 100, "name", "must not be more than 100 bytes long")
 	v.Check(m.Price > 0, "price", "must be greater than zero")
@@ -75,7 +75,7 @@ func (m *MenuModel) Update(menu *Menu) error {
 }
 
 // Delete removes a menu item from the database by ID.
-func (m *MenuModel) Delete(id int) error {
+func (m *MenuModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}
@@ -105,7 +105,7 @@ func (m *MenuModel) Delete(id int) error {
 }
 
 // Get retrieves a menu item from the database by ID.
-func (m *MenuModel) Get(id int) (*Menu, error) {
+func (m *MenuModel) Get(id int64) (*Menu, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}

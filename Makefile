@@ -35,12 +35,12 @@ migration/new:
 # Apply all up migrations
 .PHONY: migration/up
 migration/up:
-	migrate -path ./migrations -database "$(DB_DSN)" up 1
+	migrate -path ./migrations -database "$(DB_DSN)" up 
 
 # Apply all down 1 migrations
 .PHONY: migration/down
 migration/down:
-	migrate -path ./migrations -database "$(DB_DSN)" down 1
+	migrate -path ./migrations -database "$(DB_DSN)" down 
 
 # fix and reapply the last migration and fix dirty state
 .PHONY: migration/fix

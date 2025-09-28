@@ -3,10 +3,8 @@
 package data
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
 )
@@ -48,7 +46,7 @@ func (m *MenuModel) Insert(menu *Menu) error {
 		menu.LastModifiedBy,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := getContext()
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, query, args...).
@@ -70,7 +68,7 @@ func (m *MenuModel) Update(menu *Menu) error {
 		menu.ID,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := getContext()
 	defer cancel()
 
 	return m.DB.QueryRowContext(ctx, query, args...).Scan(&menu.UpdatedAt)
@@ -86,7 +84,7 @@ func (m *MenuModel) Delete(id int) error {
 		DELETE FROM menu
 		WHERE id = $1`
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := getContext()
 	defer cancel()
 
 	result, err := m.DB.ExecContext(ctx, query, id)
@@ -119,7 +117,7 @@ func (m *MenuModel) Get(id int) (*Menu, error) {
 
 	var menu Menu
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := getContext()
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query, id).Scan(
@@ -153,7 +151,7 @@ func (m *MenuModel) GetAll(name string, price float32, lastModified string, filt
 		ORDER BY %s %s, id ASC
 		LIMIT $4 OFFSET $5`, filters.SortColumn(), filters.SortDirection())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := getContext()
 	defer cancel()
 
 	rows, err := m.DB.QueryContext(ctx, query, name, price, lastModified, filters.Limit(), filters.Offset())

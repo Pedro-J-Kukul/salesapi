@@ -48,3 +48,8 @@ func (v *Validator) Matches(value string, rx *regexp.Regexp) bool {
 func (v *Validator) IsOkay(value string, permittedValues ...string) bool {
 	return slices.Contains(permittedValues, value)
 }
+
+// ValidateFloat checks if a float value is within a specified range.
+func (v *Validator) IsOkayFloat(value float32, min float32, max float32) bool {
+	return value >= min && value <= max
+}

@@ -347,7 +347,7 @@ func (m *UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error
 		ON users.id = tokens.user_id
 		WHERE tokens.scope = $1
 		AND tokens.hash = $2
-		AND tokens.expiry > $3
+		AND tokens.expires_at > $3
 	`
 
 	tokenHash := sha256.Sum256([]byte(tokenPlaintext))

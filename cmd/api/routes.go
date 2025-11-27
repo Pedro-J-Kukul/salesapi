@@ -37,10 +37,10 @@ func (app *app) routes() http.Handler {
 	router.Handler(http.MethodPut, "/v1/users/profile/:id", app.requireAuthenticatedUser(http.HandlerFunc(app.updateUserHandler)))  // Update Authenticated User Info
 
 	// User Routes
-	router.Handler(http.MethodGet, "/v1/users", app.requireAuthenticatedUser(app.requirePermissions("users:read")(http.HandlerFunc(app.listUsersHandler))))           // List All Users
-	router.Handler(http.MethodGet, "/v1/users/:id", app.requireAuthenticatedUser(app.requirePermissions("users:read")(http.HandlerFunc(app.showUserHandler))))        // Get User by ID
-	router.Handler(http.MethodDelete, "/v1/users/:id", app.requireAuthenticatedUser(app.requirePermissions("users:delete")(http.HandlerFunc(app.deleteUserHandler)))) // Delete User by ID
-	router.Handler(http.MethodPut, "/v1/users/:id", app.requireAuthenticatedUser(app.requirePermissions("users:update")(http.HandlerFunc(app.updateUserHandler))))    // Update User by ID
+	router.Handler(http.MethodGet, "/v1/user", app.requireAuthenticatedUser(app.requirePermissions("users:read")(http.HandlerFunc(app.listUsersHandler))))           // List All Users
+	router.Handler(http.MethodGet, "/v1/user/:id", app.requireAuthenticatedUser(app.requirePermissions("users:read")(http.HandlerFunc(app.showUserHandler))))        // Get User by ID
+	router.Handler(http.MethodDelete, "/v1/user/:id", app.requireAuthenticatedUser(app.requirePermissions("users:delete")(http.HandlerFunc(app.deleteUserHandler)))) // Delete User by ID
+	router.Handler(http.MethodPut, "/v1/user/:id", app.requireAuthenticatedUser(app.requirePermissions("users:update")(http.HandlerFunc(app.updateUserHandler))))    // Update User by ID
 
 	// Product Routes, all but view require authentication, the rest require specific permissions
 	router.Handler(http.MethodGet, "/v1/products", app.requirePermissions("products:read")(http.HandlerFunc(app.listProductsHandler)))                                         // List All Products

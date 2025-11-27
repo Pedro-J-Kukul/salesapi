@@ -1,5 +1,4 @@
-// Filename: /internal/validator/validator.go
-// Define a package for data validation utilities.
+// File: internal/validator/validator.go
 package validator
 
 import (
@@ -7,49 +6,66 @@ import (
 	"slices"
 )
 
-// Validator struct to hold validation errors.
+// ----------------------------------------------------------------------
+//
+//	Common Regular Expressions
+//
+// ----------------------------------------------------------------------
+
+// EmailRegex is a regular expression for validating email addresses.
+var EmailRX = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+// Password Comlpexity Regex
+var (
+	PasswordNumberRX  = regexp.MustCompile("[0-9]")
+	PasswordUpperRX   = regexp.MustCompile("[A-Z]")
+	PasswordLowerRX   = regexp.MustCompile("[a-z]")
+	PasswordSpecialRX = regexp.MustCompile("[!@#~$%^&*()+|_]")
+	PasswordMinLength = 8
+	PasswordMaxLength = 72
+)
+
+// ----------------------------------------------------------------------
+//
+//	 Validation Utilities
+//
+// ----------------------------------------------------------------------
+
+// Validator is a struct that holds validation errors.
 type Validator struct {
 	Errors map[string]string
 }
 
 // New creates a new Validator instance.
 func New() *Validator {
-	return &Validator{
-		Errors: make(map[string]string),
-	}
+	return &Validator{Errors: make(map[string]string)}
 }
 
-// IsEmpty checks if there are no validation errors.
-func (v *Validator) IsEmpty() bool {
+// Valid returns true if there are no validation errors.
+func (v *Validator) IsValid() bool {
 	return len(v.Errors) == 0
 }
 
-// AddErrors adds a new error message for a given key if it doesn't already exist.
-func (v *Validator) AddErrors(key string, message string) {
-	_, exists := v.Errors[key]
-	if !exists {
+// AddError adds an error message for a specific key.
+func (v *Validator) AddError(key, message string) {
+	if _, exists := v.Errors[key]; !exists {
 		v.Errors[key] = message
 	}
 }
 
-// Check adds an error message for a key if the condition is false.
-func (v *Validator) Check(ok bool, key string, message string) {
-	if !ok {
-		v.AddErrors(key, message)
+// Check adds an error message if the condition is false.
+func (v *Validator) Check(condition bool, key, message string) {
+	if !condition {
+		v.AddError(key, message)
 	}
 }
 
-// Matches checks if the value matches the given regular expression.
-func (v *Validator) Matches(value string, rx *regexp.Regexp) bool {
-	return rx.MatchString(value)
-}
-
-// IsOkay checks if the value is within the permitted values.
-func (v *Validator) IsOkay(value string, permittedValues ...string) bool {
+// In checks if a value is in a list of permitted values.
+func (v *Validator) Permitted(value string, permittedValues ...string) bool {
 	return slices.Contains(permittedValues, value)
 }
 
-// ValidateFloat checks if a float value is within a specified range.
-func (v *Validator) IsOkayFloat(value float32, min float32, max float32) bool {
-	return value >= min && value <= max
+// Matches checks if a string matches a given regular expression.
+func (v *Validator) Matches(value string, rx *regexp.Regexp) bool {
+	return rx.MatchString(value)
 }

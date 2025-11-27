@@ -1,4 +1,5 @@
-// Filename /internal/data/filters.go
+// File: internal/data/filters.go
+
 package data
 
 import (
@@ -7,68 +8,85 @@ import (
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
 )
 
-// Filters struct to hold filter parameters for querying data.
-type Filters struct {
-	Page         int
-	PageSize     int
-	Sort         string
-	SortSafelist []string
+// ----------------------------------------------------------------------
+//
+//	Definitions
+//
+// ----------------------------------------------------------------------
+
+// Filter represents common filtering criteria for querying records.
+type Filter struct {
+	Page         int64    `json:"page"`
+	PageSize     int64    `json:"page_size"`
+	SortBy       string   `json:"sort_by"`
+	SortSafeList []string `json:"-"`
 }
 
-// Metadata struct to hold pagination metadata.
-type Metadata struct {
-	CurrentPage  int `json:"current_page,omitempty"`
-	PageSize     int `json:"page_size,omitempty"`
-	FirstPage    int `json:"first_page,omitempty"`
-	LastPage     int `json:"last_page,omitempty"`
-	TotalRecords int `json:"total_records,omitempty"`
+// MetaData contains pagination metadata.
+type MetaData struct {
+	CurrentPage  int64 `json:"current_page,omitempty"`  // Current page number
+	PageSize     int64 `json:"page_size,omitempty"`     // Number of records per page
+	FirstPage    int64 `json:"first_page,omitempty"`    // First page number
+	LastPage     int64 `json:"last_page,omitempty"`     // Last page number
+	TotalRecords int64 `json:"total_records,omitempty"` // Total number of records
 }
 
-// Validate checks the filters for any validation errors.
-func ValidateFilters(v *validator.Validator, f Filters) {
-	v.Check(f.Page > 0, "page", "must be greater than zero")
-	v.Check(f.Page <= 100, "page", "must be a maximum of 100")
-	v.Check(f.PageSize > 0, "page_size", "must be greater than zero")
-	v.Check(f.PageSize <= 100, "page_size", "must be a maximum of 100")
-	v.Check(v.IsOkay(f.Sort, f.SortSafelist...), "sort", "invalid sort value")
+// ----------------------------------------------------------------------
+//
+//	Methods
+//
+// ----------------------------------------------------------------------
+
+// ValidateFilters checks the validity of the filter parameters.
+func ValidateFilters(v *validator.Validator, f Filter) {
+	v.Check(f.Page > 0, "page", "must be greater than zero")                        // Page must be greater than 0
+	v.Check(f.Page <= 500, "page", "must be a maximum of 500")                      // Page must be at most 500
+	v.Check(f.PageSize > 0, "page_size", "must be greater than zero")               // PageSize must be greater than 0
+	v.Check(f.PageSize <= 100, "page_size", "must be a maximum of 100")             // PageSize must be at most 100
+	v.Check(v.Permitted(f.SortBy, f.SortSafeList...), "sort", "invalid sort value") // Sort must be in the safelist
 }
 
-// CalculateMetadata computes pagination metadata based on total records and current filters.
-func CalculateMetadata(totalRecords, page, pageSize int) Metadata {
-	if totalRecords == 0 {
-		return Metadata{}
-	}
-
-	return Metadata{
-		CurrentPage:  page,
-		PageSize:     pageSize,
-		FirstPage:    1,
-		LastPage:     (totalRecords + pageSize - 1) / pageSize,
-		TotalRecords: totalRecords,
-	}
-}
-
-// return page, pageSize, sort string
-func (f Filters) Limit() int {
+// Limit calculates the SQL LIMIT value based on the page size.
+func (f Filter) Limit() int64 {
 	return f.PageSize
 }
 
-func (f Filters) Offset() int {
+// Offset calculates the SQL OFFSET value based on the current page and page size.
+func (f Filter) Offset() int64 {
 	return (f.Page - 1) * f.PageSize
 }
 
-func (f Filters) SortColumn() string {
-	for _, safeValue := range f.SortSafelist {
-		if safeValue == f.Sort {
-			return strings.TrimPrefix(f.Sort, "-")
+// SortColumn returns the column name to sort by, removing any leading '-' for descending order.
+func (f Filter) SortColumn() string {
+	for _, safeValue := range f.SortSafeList {
+		if f.SortBy == safeValue {
+			return strings.TrimPrefix(f.SortBy, "-") // Remove leading '-' if present
 		}
 	}
-	return ""
+	panic("unsafe sort parameter: " + f.SortBy) // Panic if the sort parameter is not in the safelist
 }
 
-func (f Filters) SortDirection() string {
-	if strings.HasPrefix(f.Sort, "-") {
+// SortDirection returns the sort direction ("ASC" or "DESC") based on the SortBy field.
+func (f Filter) SortDirection() string {
+	if strings.HasPrefix(f.SortBy, "-") {
 		return "DESC"
 	}
 	return "ASC"
+}
+
+// CalculateMetaData computes pagination metadata based on total records, current page, and page size.
+func CalculateMetaData(totalRecords, page, pageSize int64) MetaData {
+	if totalRecords == 0 {
+		return MetaData{}
+	}
+
+	lastPage := (totalRecords + pageSize - 1) / pageSize // Calculate last page number
+
+	return MetaData{
+		CurrentPage:  page,
+		PageSize:     pageSize,
+		FirstPage:    1,
+		LastPage:     lastPage,
+		TotalRecords: totalRecords,
+	}
 }

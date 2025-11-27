@@ -1,220 +1,104 @@
-// Filename: internal/data/sales.go
+// File internal/data/sales.go
 package data
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
-	"github.com/lib/pq"
 )
 
-// Sale struct represents the sale record for the items sold
+// ----------------------------------------------------------------------
+//
+//	Definitions
+//
+// ----------------------------------------------------------------------
+
+// Sale represents a sales record in the system.
 type Sale struct {
-	ID        int64      `json:"id"`
-	Cashier   string     `json:"cashier"`
-	Total     float32    `json:"total"`
-	CashPaid  float32    `json:"cash_paid"`
-	ChangeDue float32    `json:"change_due"`
-	CreatedAt string     `json:"created_at"`
-	Items     []SaleItem `json:"items,omitempty"` // Items included in this sale
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	ProductID int64     `json:"product_id"`
+	Quantity  int64     `json:"quantity"`
+	SoldAt    time.Time `json:"sold_at"`
 }
 
-// SaleItem struct represents an item in a sale
-type SaleItem struct {
-	ID             int64   `json:"id"`
-	MenuID         int64   `json:"menu_id"`
-	SaleID         int64   `json:"sale_id"`
-	Quantity       int64   `json:"quantity"`
-	UnitPrice      float32 `json:"unit_price"`
-	LastModifiedBy string  `json:"last_modified_by"`
-	CreatedAt      string  `json:"created_at"`
-	MenuName       string  `json:"menu_name,omitempty"` // Name of the menu item
+// SaleModel wraps a sql.DB connection pool.
+type SaleModel struct {
+	DB *sql.DB
 }
 
-// CreateSaleRequest struct represents the request payload for creating a sale
-type CreateSaleRequest struct {
-	Cashier  string           `json:"cashier"`
-	CashPaid float32          `json:"cash_paid"`
-	Items    []CreateSaleItem `json:"items"`
+// SaleFilter represents filtering criteria for querying sales.
+type SaleFilter struct {
+	Filter    Filter `json:"filter"`
+	UserID    int64  `json:"user_id"`
+	ProductID int64  `json:"product_id"`
+	MinDate   string `json:"min_date"`
+	MaxDate   string `json:"max_date"`
+	MinQty    int64  `json:"min_qty"`
+	MaxQty    int64  `json:"max_qty"`
 }
 
-// CreateSaleItem struct represents an item in the create sale request
-type CreateSaleItem struct {
-	MenuID   int64 `json:"menu_id"`
-	Quantity int64 `json:"quantity"`
+// ----------------------------------------------------------------------
+//
+//	Methods
+//
+// ----------------------------------------------------------------------
+// ValidateSale checks the fields of a Sale struct to ensure they meet the required criteria.
+func ValidateSale(v *validator.Validator, sale *Sale) {
+	v.Check(sale.UserID > 0, "user_id", "must be a positive integer")
+	v.Check(sale.ProductID > 0, "product_id", "must be a positive integer")
+	v.Check(sale.Quantity > 0, "quantity", "must be a positive integer")
 }
 
-// ValidateSale checks the fields of the Sale struct for validity
-func ValidateSale(v *validator.Validator, s *Sale) {
-	v.Check(s.Cashier != "", "cashier_name", "must be provided")
-	v.Check(len(s.Cashier) <= 255, "cashier_name", "must not be more than 255 bytes long")
-	v.Check(s.Total > 0, "total_amount", "must be greater than zero")
-	v.Check(s.CashPaid > 0, "cash_paid", "must be greater than zero")
-	v.Check(s.CashPaid >= s.Total, "cash_paid", "must be greater than or equal to total amount")
-	v.Check(len(s.Items) > 0, "items", "must contain at least one item")
-}
+// Insert adds a new sale to the database.
+func (m *SaleModel) Insert(sale *Sale) error {
+	query := `
+		INSERT INTO sales (user_id, product_id, quantity, sold_at)
+		VALUES ($1, $2, $3, NOW())
+		RETURNING id, sold_at
+	`
 
-// ValidateCreateSaleRequest checks the fields of the CreateSaleRequest struct
-func ValidateCreateSaleRequest(v *validator.Validator, req *CreateSaleRequest) {
-	v.Check(req.Cashier != "", "cashier_name", "must be provided")
-	v.Check(len(req.Cashier) <= 255, "cashier_name", "must not be more than 255 bytes long")
-	v.Check(req.CashPaid > 0, "cash_paid", "must be greater than zero")
-	v.Check(len(req.Items) > 0, "items", "must contain at least one item")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	for i, item := range req.Items {
-		v.Check(item.MenuID > 0, fmt.Sprintf("items[%d].menu_id", i), "must be greater than zero")
-		v.Check(item.Quantity > 0, fmt.Sprintf("items[%d].quantity", i), "must be greater than zero")
-	}
-}
-
-func CorrectCashPaid(total, cashPaid float32) error {
-	if cashPaid < total {
-		return ErrInsufficientCash
+	if err := m.DB.QueryRowContext(ctx, query, sale.UserID, sale.ProductID, sale.Quantity).Scan(&sale.ID, &sale.SoldAt); err != nil {
+		return err
 	}
 	return nil
 }
 
-// SalesModel wraps a sql.DB connection pool
-type SalesModel struct {
-	DB *sql.DB
-}
+// Update modifies an existing sale in the database.
+func (m *SaleModel) Update(sale *Sale) error {
+	query := `
+		UPDATE sales
+		SET user_id = $1, product_id = $2, quantity = $3, sold_at = NOW()
+		WHERE id = $4
+		RETURNING sold_at
+	`
 
-// Insert adds a new sale record to the database along with its items
-func (m *SalesModel) Insert(req *CreateSaleRequest) (*Sale, error) {
-	// Start a transaction
-	tx, err := m.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	ctx, cancel := getContext()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Calculate the total amount by getting the unit price from the menus table
-	var totalAmount float32
-
-	// Extract menu IDs from the request
-	menuIDs := make([]int64, 0, len(req.Items))
-	for _, item := range req.Items {
-		menuIDs = append(menuIDs, item.MenuID)
+	if err := m.DB.QueryRowContext(ctx, query, sale.UserID, sale.ProductID, sale.Quantity, sale.ID).Scan(&sale.SoldAt); err != nil {
+		return err
 	}
-
-	// Fetch menu items from the database - CORRECTED: Use pq.Array for PostgreSQL
-	query := `SELECT id, name, price FROM menu WHERE id = ANY($1)`
-	rows, err := tx.QueryContext(ctx, query, pq.Array(menuIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	// Create a map to hold menu items for easy lookup
-	menuItems := make(map[int64]*Menu)
-	for rows.Next() {
-		var menu Menu
-		// scan into menu
-		if err := rows.Scan(&menu.ID, &menu.Name, &menu.Price); err != nil {
-			return nil, err
-		}
-		menuItems[menu.ID] = &menu
-	}
-
-	// Check if all requested menu items were found
-	if len(menuItems) != len(menuIDs) {
-		for _, id := range menuIDs {
-			if _, exists := menuItems[id]; !exists {
-				return nil, fmt.Errorf("menu item with ID %d not found", id)
-			}
-		}
-	}
-
-	// Calculate the total amount for the sale
-	for _, item := range req.Items {
-		menuItem := menuItems[item.MenuID] // Safe to access since we validated above
-		totalAmount += menuItem.Price * float32(item.Quantity)
-	}
-
-	// Validate that cash paid is sufficient
-	err = CorrectCashPaid(totalAmount, req.CashPaid)
-	if err != nil {
-		return nil, err
-	}
-
-	changeDue := req.CashPaid - totalAmount
-
-	// Insert the sale
-	sale := &Sale{
-		Cashier:   req.Cashier,
-		Total:     totalAmount,
-		CashPaid:  req.CashPaid,
-		ChangeDue: changeDue,
-	}
-
-	insertSaleQuery := `
-		INSERT INTO sales (cashier, total, cash_paid, change_due)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at`
-
-	err = tx.QueryRowContext(ctx, insertSaleQuery, sale.Cashier, sale.Total, sale.CashPaid, sale.ChangeDue).Scan(&sale.ID, &sale.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-
-	// Insert sale items
-	saleItems := make([]SaleItem, 0, len(req.Items))
-	for _, item := range req.Items {
-		menu := menuItems[item.MenuID]
-
-		saleItemQuery := `
-			INSERT INTO menu_sales (menu_id, sale_id, quantity, price, last_modified_by)
-			VALUES ($1, $2, $3, $4, $5)
-			RETURNING id, created_at`
-
-		var saleItem SaleItem
-		err = tx.QueryRowContext(ctx, saleItemQuery,
-			item.MenuID,
-			sale.ID,
-			item.Quantity,
-			menu.Price,
-			req.Cashier,
-		).Scan(&saleItem.ID, &saleItem.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
-
-		saleItem.MenuID = item.MenuID
-		saleItem.SaleID = sale.ID
-		saleItem.Quantity = item.Quantity
-		saleItem.UnitPrice = menu.Price
-		saleItem.LastModifiedBy = req.Cashier
-		saleItem.MenuName = menu.Name
-
-		saleItems = append(saleItems, saleItem)
-	}
-
-	sale.Items = saleItems
-
-	// Commit the transaction
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return sale, nil
+	return nil
 }
 
-// Delete removes a sale and all its associated items (cascade delete handles this)
-func (s *SalesModel) Delete(id int64) error {
-	if id < 1 {
-		return ErrRecordNotFound
-	}
+// Delete removes a sale from the database.
+func (m *SaleModel) Delete(id int64) error {
+	query := `
+		DELETE FROM sales
+		WHERE id = $1
+	`
 
-	query := `DELETE FROM sales WHERE id = $1`
-
-	ctx, cancel := getContext()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	result, err := s.DB.ExecContext(ctx, query, id)
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -229,4 +113,71 @@ func (s *SalesModel) Delete(id int64) error {
 	}
 
 	return nil
+}
+
+// Get retrieves a sale by its ID.
+func (m *SaleModel) Get(id int64) (*Sale, error) {
+	query := `
+		SELECT id, user_id, product_id, quantity, sold_at
+		FROM sales
+		WHERE id = $1
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	sale := &Sale{}
+
+	if err := m.DB.QueryRowContext(ctx, query, id).Scan(&sale.ID, &sale.UserID, &sale.ProductID, &sale.Quantity, &sale.SoldAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrRecordNotFound
+		}
+		return nil, err
+	}
+
+	return sale, nil
+}
+
+// GetAll retrieves sales based on filtering criteria and pagination.
+func (m *SaleModel) GetAll(filter SaleFilter) ([]*Sale, MetaData, error) {
+	query := fmt.Sprintf(`
+		SELECT id, user_id, product_id, quantity, sold_at
+		FROM sales
+		WHERE (user_id = $1 OR $1 = 0)
+		  AND (product_id = $2 OR $2 = 0)
+		  AND (sold_at >= COALESCE(NULLIF($3, ''), sold_at))
+		  AND (sold_at <= COALESCE(NULLIF($4, ''), sold_at))
+		  AND (quantity >= $5 OR $5 = 0)
+		  AND (quantity <= $6 OR $6 = 0)
+		ORDER BY %s %s
+		LIMIT $7 OFFSET $8
+	`, filter.Filter.SortColumn(), filter.Filter.SortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	rows, err := m.DB.QueryContext(ctx, query, filter.UserID, filter.ProductID, filter.MinDate, filter.MaxDate, filter.MinQty, filter.MaxQty, filter.Filter.Limit(), filter.Filter.Offset())
+	if err != nil {
+		return nil, MetaData{}, err
+	}
+	defer rows.Close()
+
+	sales := []*Sale{}
+	totalRecords := int64(0)
+
+	for rows.Next() {
+		sale := &Sale{}
+		if err := rows.Scan(&sale.ID, &sale.UserID, &sale.ProductID, &sale.Quantity, &sale.SoldAt); err != nil {
+			return nil, MetaData{}, err
+		}
+		sales = append(sales, sale)
+		totalRecords++
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, MetaData{}, err
+	}
+
+	metadata := CalculateMetaData(totalRecords, filter.Filter.Page, filter.Filter.PageSize)
+
+	return sales, metadata, nil
 }

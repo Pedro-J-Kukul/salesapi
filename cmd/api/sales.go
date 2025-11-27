@@ -1,108 +1,212 @@
+// File: cmd/api/sales.go
+// Description: sales api handlers
+
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/data"
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
 )
 
-// createSale handles POST /v1/sales
-func (a *app) createSale(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Cashier  string  `json:"cashier"`
-		CashPaid float32 `json:"cash_paid"`
-		Items    []struct {
-			MenuID   int64 `json:"menu_id"`
-			Quantity int64 `json:"quantity"`
-		} `json:"items"`
+// createSaleHandler handles the creation of a new sale.
+func (app *app) createSaleHandler(w http.ResponseWriter, r *http.Request) {
+	// Create Payload Struct
+	var SaleCreatePayload struct {
+		UserID    int64 `json:"user_id"`
+		ProductID int64 `json:"product_id"`
+		Quantity  int64 `json:"quantity"`
 	}
 
-	err := a.readJson(w, r, &input)
+	err := app.readJSON(w, r, &SaleCreatePayload)
 	if err != nil {
-		a.badRequestResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
-	// Convert input to CreateSaleRequest
-	req := &data.CreateSaleRequest{
-		Cashier:  input.Cashier,
-		CashPaid: input.CashPaid,
-		Items:    make([]data.CreateSaleItem, len(input.Items)),
+	sale := &data.Sale{
+		UserID:    SaleCreatePayload.UserID,
+		ProductID: SaleCreatePayload.ProductID,
+		Quantity:  SaleCreatePayload.Quantity,
 	}
 
-	for i, item := range input.Items {
-		req.Items[i] = data.CreateSaleItem{
-			MenuID:   item.MenuID,
-			Quantity: item.Quantity,
-		}
-	}
-
-	// Validate the request
+	// Validate Sale
 	v := validator.New()
-	data.ValidateCreateSaleRequest(v, req)
-	if !v.IsEmpty() {
-		a.failedValidationResponse(w, r, v.Errors)
+
+	if data.ValidateSale(v, sale); !v.IsValid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	// Insert the sale
-	sale, err := a.models.Sales.Insert(req)
+	err = app.models.Sales.Insert(sale)
 	if err != nil {
-		// Check for specific business logic errors
-		switch {
-		case err.Error() == "insufficient cash paid":
-			v.AddErrors("cash_paid", "insufficient cash paid for total amount")
-			a.failedValidationResponse(w, r, v.Errors)
-		case strings.Contains(err.Error(), "menu item with ID") && strings.Contains(err.Error(), "not found"):
-			v.AddErrors("items", "one or more menu items not found")
-			a.failedValidationResponse(w, r, v.Errors)
-		default:
-			a.serverErrorResponse(w, r, err)
-		}
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	// Set location header
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/sales/%d", sale.ID))
 
-	// Return the created sale
-	data := envelope{"sale": sale}
-	err = a.writeJSON(w, http.StatusCreated, data, headers)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"sale": sale}, headers)
 	if err != nil {
-		a.serverErrorResponse(w, r, err)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 }
 
-// deleteSale handles DELETE /v1/sales/{id}
-func (a *app) deleteSale(w http.ResponseWriter, r *http.Request) {
-	id, err := a.readIDParam(r)
-	if err != nil {
-		a.notFoundResponse(w, r)
+// listSalesHandler handles listing sales with optional filtering and pagination.
+func (app *app) listSalesHandler(w http.ResponseWriter, r *http.Request) {
+	// Read Query Parameters
+	query := r.URL.Query()
+	v := validator.New()
+
+	SaleSafeList := []string{"id", "user_id", "product_id", "quantity", "sold_at"}
+
+	filter := app.readFilters(query, "id", 20, SaleSafeList, v)
+	filters := data.SaleFilter{
+		Filter:    filter,
+		UserID:    app.getSingleIntQueryParameter(query, "user_id", 0, v),
+		ProductID: app.getSingleIntQueryParameter(query, "product_id", 0, v),
+		MinQty:    app.getSingleIntQueryParameter(query, "min_qty", 0, v),
+		MaxQty:    app.getSingleIntQueryParameter(query, "max_qty", 0, v),
+		MinDate:   app.getSingleDateQueryParameter(query, "min_date", "", v),
+		MaxDate:   app.getSingleDateQueryParameter(query, "max_date", "", v),
+	}
+
+	if !v.IsValid() {
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
-	err = a.models.Sales.Delete(id)
+	sales, metadata, err := app.models.Sales.GetAll(filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"sales": sales, "metadata": metadata}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
+// deleteSalesHandler handles the deletion of a sale.
+func (app *app) deleteSalesHandler(w http.ResponseWriter, r *http.Request) {
+	// get the id parameter from the url
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	err = app.models.Sales.Delete(id)
 	if err != nil {
 		switch {
-		case errors.Is(err, data.ErrRecordNotFound):
-			a.notFoundResponse(w, r)
+		case err == data.ErrRecordNotFound:
+			app.notFoundResponse(w, r)
 		default:
-			a.serverErrorResponse(w, r, err)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	// If we reach this point, the deletion was successful
-	data := envelope{"message": "sale successfully deleted"}
-	err = a.writeJSON(w, http.StatusOK, data, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "sale successfully deleted"}, nil)
 	if err != nil {
-		a.serverErrorResponse(w, r, err)
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
+// updateSaleHandler handles updating an existing sale.
+func (app *app) updateSaleHandler(w http.ResponseWriter, r *http.Request) {
+	// get the id parameter from the url
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	sales, err := app.models.Sales.Get(id)
+	if err != nil {
+		switch {
+		case err == data.ErrRecordNotFound:
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// Create Payload Struct
+	var SaleUpdatePayload struct {
+		UserID    *int64 `json:"user_id"`
+		ProductID *int64 `json:"product_id"`
+		Quantity  *int64 `json:"quantity"`
+	}
+
+	err = app.readJSON(w, r, &SaleUpdatePayload)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if SaleUpdatePayload.UserID != nil {
+		sales.UserID = *SaleUpdatePayload.UserID
+	}
+	if SaleUpdatePayload.ProductID != nil {
+		sales.ProductID = *SaleUpdatePayload.ProductID
+	}
+	if SaleUpdatePayload.Quantity != nil {
+		sales.Quantity = *SaleUpdatePayload.Quantity
+	}
+
+	// Validate Sale
+	v := validator.New()
+
+	if data.ValidateSale(v, sales); !v.IsValid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	err = app.models.Sales.Update(sales)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"sale": sales}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}
+
+// getSaleHandler handles retrieving a specific sale by ID.
+func (app *app) getSaleHandler(w http.ResponseWriter, r *http.Request) {
+	// Read the id parameter from the url
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	sale, err := app.models.Sales.Get(id)
+	if err != nil {
+		switch {
+		case err == data.ErrRecordNotFound:
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"sale": sale}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 }

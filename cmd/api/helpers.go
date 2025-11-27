@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/Pedro-J-Kukul/salesapi/internal/data"
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
 	"github.com/julienschmidt/httprouter"
 )
@@ -49,7 +51,7 @@ func (a *app) writeJSON(w http.ResponseWriter, status int, data envelope, header
 	return nil
 }
 
-func (a *app) readJson(w http.ResponseWriter, r *http.Request, dest any) error {
+func (a *app) readJSON(w http.ResponseWriter, r *http.Request, dest any) error {
 
 	// limit the size of the request body to 256000 bytes
 	maxBytes := 256_000
@@ -132,65 +134,151 @@ func (a *app) readIDParam(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-// get single string query parameter
-func (a *app) getSingleQueryParam(queryParameters url.Values, key string, defaultValue string) string {
-	// get the values from the url
-	result := queryParameters.Get(key)
+/************************************************************************************************************/
+// Helper functions for reading URL parameters
+/************************************************************************************************************/
 
-	// if no value is found, return the default value
-	if result == "" {
-		return defaultValue
+// readIDParameter extracts and validates an "id" parameter from the URL
+func (app *app) readIDParameter(r *http.Request) (int64, error) {
+
+	params := httprouter.ParamsFromContext(r.Context()) // get the URL parameters from the request context
+
+	id, err := strconv.ParseInt(params.ByName("id"), 10, 64) // parse the "id" parameter as a base-10 int64
+	if err != nil || id < 1 {
+		return 0, errors.New("invalid id parameter") // return an error if parsing fails or id is less than 1
 	}
 
-	return result
-
+	return id, nil // return the valid id
 }
 
-// mget multiple values for a query parameter
-func (a *app) getMultiplequeryParam(queryParameters url.Values, key string, defaultValue []string) []string {
-	// get the values from the url
-	result := queryParameters.Get(key)
-
-	// if no value is found, return the default value
+// getSingleQueryParameter retrieves a single query parameter from the URL, returning a default value if not found
+func (app *app) getSingleQueryParameter(params url.Values, key string, defaultValue string) string {
+	result := params.Get(key) // get the value of the specified query parameter
 	if result == "" {
-		return defaultValue
+		return defaultValue // return the default value if the parameter is not found
 	}
-	return strings.Split(result, ",")
+	return result // return the parameter value
 }
 
-// this method can cause a validation error if the parameter is not an integer
-func (a *app) getSingleIntegegerParam(queryParameters url.Values, key string, defaultValue int, v *validator.Validator) int {
-	// get the values from the url
-	result := queryParameters.Get(key)
-
-	// if no value is found, return the default value
+// getMultipleQueryParameter retrieves multiple values for a query parameter from the URL, returning a default slice if not found
+func (app *app) getMultipleQueryParameter(params url.Values, key string, defaultValue []string) []string {
+	result := params.Get(key) // get the values of the specified query parameter
 	if result == "" {
-		return defaultValue
+		return defaultValue // return the default slice if the parameter is not found
+	}
+	return strings.Split(result, ",") // split the parameter value by commas and return the resulting slice
+}
+
+// getSingleIntQueryParameter retrieves and validates a single integer query parameter from the URL, returning a default value if not found or invalid
+func (app *app) getSingleIntQueryParameter(params url.Values, key string, defaultValue int64, v *validator.Validator) int64 {
+	result := params.Get(key) // get the value of the specified query parameter
+	if result == "" {
+		return defaultValue // return the default value if the parameter is not found
 	}
 
-	// convert the string to an integer
-	intResult, err := strconv.Atoi(result)
+	i, err := strconv.ParseInt(result, 10, 64) // attempt to convert the parameter value to an integer
 	if err != nil {
-		v.AddErrors(key, "must be an integer value")
-		return defaultValue
+		v.AddError(key, "must be an integer value") // add a validation error if conversion fails
+		return defaultValue                         // return the default value in case of error
 	}
-	return intResult
+
+	return i // return the valid integer value
 }
 
-func (a *app) getSingleFloatParam(queryParameters url.Values, key string, defaultValue float32, v *validator.Validator) float32 {
-	// get the values from the url
-	result := queryParameters.Get(key)
-
-	// if no value is found, return the default value
+// GetSingleFloatQueryParameter retrieves and validates a single float query parameter from the URL, returning a default value if not found or invalid
+func (app *app) getSingleFloatQueryParameter(params url.Values, key string, defaultValue float64, v *validator.Validator) float64 {
+	result := params.Get(key) // get the value of the specified query parameter
 	if result == "" {
-		return defaultValue
+		return defaultValue // return the default value if the parameter is not found
 	}
 
-	// convert the string to an integer
-	floatResult, err := strconv.ParseFloat(result, 32)
+	f, err := strconv.ParseFloat(result, 64) // attempt to convert the parameter value to a float
 	if err != nil {
-		v.AddErrors(key, "must be a float value")
-		return defaultValue
+		v.AddError(key, "must be a float value") // add a validation error if conversion fails
+		return defaultValue                      // return the default value in case of error
 	}
-	return float32(floatResult)
+
+	return f // return the valid float value
+}
+
+// getSingleDateQueryParameter retrieves and validates a single date query parameter from the URL, returning a default value if not found or invalid
+func (app *app) getSingleDateQueryParameter(params url.Values, key string, defaultValue string, v *validator.Validator) string {
+	result := params.Get(key) // get the value of the specified query parameter
+	if result == "" {
+		return defaultValue // return the default value if the parameter is not found
+	}
+
+	// Validate the date format (assuming "YYYY-MM-DD" format)
+	if _, err := strconv.ParseInt(strings.ReplaceAll(result, "-", ""), 10, 64); err != nil || len(result) != 10 {
+		v.AddError(key, "must be a valid date in YYYY-MM-DD format") // add a validation error if format is incorrect
+		return defaultValue                                          // return the default value in case of error
+	}
+
+	return result // return the valid date string
+}
+
+// getOptionalBoolQueryParameter retrieves a boolean query parameter returning a pointer if present.
+func (app *app) getOptionalBoolQueryParameter(params url.Values, key string, v *validator.Validator) *bool {
+	value := params.Get(key)
+	if value == "" {
+		return nil
+	}
+
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		v.AddError(key, "must be true or false")
+		return nil
+	}
+
+	return &b
+}
+
+// getOptionalInt64QueryParameter retrieves an int64 query parameter returning a pointer if present.
+func (app *app) getOptionalInt64QueryParameter(params url.Values, key string, v *validator.Validator) *int64 {
+	value := params.Get(key)
+	if value == "" {
+		return nil
+	}
+
+	i, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		v.AddError(key, "must be an integer value")
+		return nil
+	}
+
+	return &i
+}
+
+// readFilters constructs a Filters struct using standard query parameters and validates it.
+func (app *app) readFilters(query url.Values, defaultSort string, defaultPageSize int64, safelist []string, v *validator.Validator) data.Filter {
+	filters := data.Filter{
+		Page:         app.getSingleIntQueryParameter(query, "page", 1, v),
+		PageSize:     app.getSingleIntQueryParameter(query, "page_size", defaultPageSize, v),
+		SortBy:       app.getSingleQueryParameter(query, "sort", defaultSort),
+		SortSafeList: safelist,
+	}
+
+	data.ValidateFilters(v, filters)
+	return filters
+}
+
+/************************************************************************************************************/
+// Go routine helper functions
+/************************************************************************************************************/
+// background runs a function in the background as a goroutine, recovering from any panics and logging them
+func (app *app) background(fn func()) {
+	app.wg.Add(1) // increment the wait group counter
+
+	go func() {
+		defer app.wg.Done() // decrement the wait group counter when the goroutine completes
+
+		// recover from any panics and log the error
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.Error("panic recovered in background goroutine", slog.Any("error", err)) // log the panic error
+			}
+		}()
+
+		fn() // execute the provided function
+	}()
 }

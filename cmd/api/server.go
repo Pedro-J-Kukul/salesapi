@@ -1,3 +1,4 @@
+// Filename: cmd/api/server.go
 package main
 
 import (
@@ -12,50 +13,53 @@ import (
 	"time"
 )
 
-// Function to start the HTTP server
+// serve starts the HTTP server and listens for incoming requests
 func (app *app) serve() error {
 
-	// Server configuration
+	// Define the server configuration
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.config.port),
-		Handler:      app.routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(app.logger.Handler(), slog.LevelError),
+		Addr:         fmt.Sprintf(":%d", app.config.port),                      // server address with port
+		Handler:      app.routes(),                                             // HTTP handler for routing requests
+		IdleTimeout:  1 * time.Minute,                                          // maximum idle time for connections
+		ReadTimeout:  5 * time.Second,                                          // maximum duration for reading the request
+		WriteTimeout: 10 * time.Second,                                         // maximum duration for writing the response
+		ErrorLog:     slog.NewLogLogger(app.logger.Handler(), slog.LevelError), // custom error logger
 	}
 
-	shutdownError := make(chan error) // channel to receive shutdown errors
-	// Goroutine to handle graceful shutdown
-	go func() {
-		quit := make(chan os.Signal, 1)                      // channel to receive OS signals
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM) // listen for interrupt and terminate signals
-		s := <-quit                                          // block until a signal is received
-		app.logger.Info("shutting down server", "signal", s) // log the shutdown signal
+	shutdown := make(chan error) // channel for shutdown errors
 
-		// 30 second timeout for the shutdown
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()                                   // run until the timeout expires
-		app.logger.Error("attempting graceful shutdown") // log the shutdown attempt
-		shutdownError <- srv.Shutdown(ctx)               // attempt to gracefully shutdown the server
+	// Start a goroutine to listen for shutdown signals
+	go func() {
+		quit := make(chan os.Signal, 1)                                              // channel for OS signals
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)                         // listen for interrupt and terminate signals
+		sig := <-quit                                                                // block until a signal is received
+		app.logger.Info("shutting down server", slog.String("signal", sig.String())) // log the shutdown signal
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // context with timeout for shutdown
+		defer cancel()                                                           // ensure the context is cancelled to free resources
+
+		err := srv.Shutdown(ctx) // attempt to gracefully shutdown the server
+		if err != nil {
+			shutdown <- err // send any shutdown error to the channel
+		}
+
+		app.logger.Info("completing background tasks") // log completion of background tasks
+		app.wg.Wait()                                  // wait for all background tasks to complete
+		shutdown <- nil                                // signal that shutdown is complete
 	}()
 
-	// log the server start
-	app.logger.Info("starting server", "addr", srv.Addr, "env", app.config.env)
+	app.logger.Info("starting server", slog.String("env", app.config.env), slog.Int("port", app.config.port)) // log server start
 
-	// Start the server
-	err := srv.ListenAndServe()
-	if !errors.Is(err, http.ErrServerClosed) {
-		app.logger.Error("server error", "error", err) // log any errors starting the server
-		return err
+	err := srv.ListenAndServe()                // start the server and listen for requests
+	if !errors.Is(err, http.ErrServerClosed) { // check if the error is not due to server shutdown
+		return err // return any unexpected error
 	}
-	// Wait for the shutdown goroutine to complete
-	err = <-shutdownError
+
+	err = <-shutdown // wait for shutdown to complete
 	if err != nil {
-		return err
+		return err // return any shutdown error
 	}
 
-	app.logger.Info("server stopped", "addr", srv.Addr) // log the server stop
-
-	return nil
+	app.logger.Info("server stopped") // log that the server has stopped
+	return nil                        // return nil indicating successful shutdown
 }

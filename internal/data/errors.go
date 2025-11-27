@@ -9,5 +9,6 @@ var (
 	ErrEditConflict     = errors.New("edit conflict")
 	ErrInvalidID        = errors.New("invalid ID")
 	ErrNoRecords        = errors.New("no matching records found")
+	ErrDuplicateEmail   = errors.New("duplicate email")
 	ErrInsufficientCash = errors.New("insufficient cash provided")
 )

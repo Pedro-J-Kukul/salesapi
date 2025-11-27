@@ -16,6 +16,7 @@ import (
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/data"
 	"github.com/Pedro-J-Kukul/salesapi/internal/mailer"
+	"github.com/Pedro-J-Kukul/salesapi/internal/sheets"
 )
 
 const version = "v0.3.0"
@@ -45,14 +46,20 @@ type config struct {
 		password string // SMTP password
 		sender   string // SMTP sender address
 	}
+	sheets struct {
+		serviceAccountKey string // Google service account key JSON
+		spreadsheetID     string // Google Sheets spreadsheet ID
+		enabled           bool   // whether Google Sheets is enabled
+	}
 }
 
 type app struct {
-	config config         // application configuration settings
-	logger *slog.Logger   // logger for structured logging
-	wg     sync.WaitGroup // wait group for managing goroutines
-	models data.Models
-	mailer *mailer.Mailer
+	config        config           // application configuration settings
+	logger        *slog.Logger     // logger for structured logging
+	wg            sync.WaitGroup   // wait group for managing goroutines
+	models        data.Models
+	mailer        *mailer.Mailer
+	sheetsService *sheets.Service
 }
 
 func main() {
@@ -90,6 +97,17 @@ func main() {
 		app.mailer = mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender)
 	}
 
+	// Initialize Google Sheets client if configured
+	if cfg.sheets.enabled && cfg.sheets.serviceAccountKey != "" && cfg.sheets.spreadsheetID != "" {
+		sheetsClient, err := sheets.NewClientFromJSON(cfg.sheets.serviceAccountKey, cfg.sheets.spreadsheetID)
+		if err != nil {
+			logger.Warn("failed to initialize Google Sheets client", slog.Any("error", err))
+		} else {
+			app.sheetsService = sheets.NewService(sheetsClient)
+			logger.Info("Google Sheets integration enabled")
+		}
+	}
+
 	err = app.serve() // start the HTTP server
 	if err != nil {
 		logger.Error("error starting server", slog.Any("error", err)) // log any error starting the server
@@ -125,6 +143,11 @@ func loadConfig() config {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")                                 // SMTP username
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")                                 // SMTP password
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Training <noreply@example.com>", "SMTP sender address") // SMTP sender address
+
+	// Google Sheets settings
+	flag.StringVar(&cfg.sheets.serviceAccountKey, "sheets-service-account-key", "", "Google Sheets service account key JSON")
+	flag.StringVar(&cfg.sheets.spreadsheetID, "sheets-spreadsheet-id", "", "Google Sheets spreadsheet ID")
+	flag.BoolVar(&cfg.sheets.enabled, "sheets-enabled", false, "Enable Google Sheets integration")
 
 	flag.Parse() // parse the command-line flags
 
@@ -164,6 +187,19 @@ func loadConfig() config {
 	if cfg.smtp.sender == "Training <noreply@example.com>" {
 		if sender := os.Getenv("SMTP_SENDER"); sender != "" {
 			cfg.smtp.sender = sender
+		}
+	}
+
+	// Google Sheets configuration from environment
+	if cfg.sheets.serviceAccountKey == "" {
+		cfg.sheets.serviceAccountKey = os.Getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
+	}
+	if cfg.sheets.spreadsheetID == "" {
+		cfg.sheets.spreadsheetID = os.Getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+	}
+	if !cfg.sheets.enabled {
+		if enabled := os.Getenv("GOOGLE_SHEETS_ENABLED"); enabled == "true" {
+			cfg.sheets.enabled = true
 		}
 	}
 

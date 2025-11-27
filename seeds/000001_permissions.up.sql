@@ -14,4 +14,6 @@ INSERT INTO permissions (code) VALUES
 ('self:create'),
 ('self:view'),
 ('self:delete'),
-('self:update');
+('self:update'),
+('exports:create'),
+('exports:read');

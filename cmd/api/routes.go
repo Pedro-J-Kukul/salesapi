@@ -56,5 +56,10 @@ func (app *app) routes() http.Handler {
 	router.Handler(http.MethodPut, "/v1/sales/:id", app.requireAuthenticatedUser(app.requirePermissions("sales:update")(http.HandlerFunc(app.updateSaleHandler))))     // Update Sale by ID
 	router.Handler(http.MethodDelete, "/v1/sales/:id", app.requireAuthenticatedUser(app.requirePermissions("sales:delete")(http.HandlerFunc(app.deleteSalesHandler)))) // Delete Sale by ID
 
+	// Export Routes - require authentication and export permissions
+	router.Handler(http.MethodPost, "/v1/exports/sales", app.requireAuthenticatedUser(app.requirePermissions("exports:create")(http.HandlerFunc(app.exportSalesHandler))))     // Export Sales to Google Sheets
+	router.Handler(http.MethodGet, "/v1/exports/history", app.requireAuthenticatedUser(app.requirePermissions("exports:read")(http.HandlerFunc(app.listExportHistoryHandler)))) // Get Export History
+	router.Handler(http.MethodGet, "/v1/exports/sheets", app.requireAuthenticatedUser(app.requirePermissions("exports:read")(http.HandlerFunc(app.getSheetsInfoHandler))))     // Get Sheets Info
+
 	return app.recoverPanic(app.enableCORS(app.metrics(app.rateLimit(app.authenticate(router)))))
 }

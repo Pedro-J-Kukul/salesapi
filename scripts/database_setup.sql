@@ -1,10 +1,15 @@
 -- Database Setup Script for Sales API
 -- This script creates the database and user for the Sales API application
 
+-- NOTE: This script uses a simple password for testing/development purposes.
+-- For production environments, use a strong password and consider using 
+-- environment variables or a secrets management system.
+
 -- Create the sales database
 CREATE DATABASE sales;
 
 -- Create the sales user with password
+-- WARNING: Change this password for production use
 CREATE USER sales WITH PASSWORD 'sales';
 
 -- Grant all privileges on the sales database to the sales user

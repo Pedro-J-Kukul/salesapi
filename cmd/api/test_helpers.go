@@ -68,6 +68,7 @@ func newTestApp(t *testing.T) (*app, *data.TestUtils) {
 
 	testApp := &app{
 		config: cfg,
+		logger: setUpLogger("test"),
 		models: data.NewModels(db),
 	}
 

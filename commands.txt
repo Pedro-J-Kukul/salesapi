@@ -1,0 +1,95 @@
+// Creationg a user
+curl -X POST http://localhost:4000/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "doe@example.com",
+    "password": "Password!23",
+    "role": "admin"
+  }'
+
+  // Actovatomg a iser
+curl -X PUT http://localhost:4000/v1/users/activate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "7W6iQFiimwpOGV6H1JcK3Q"
+  }'
+Logging In
+curl -X POST http://localhost:4000/v1/tokens/authentication \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "doe@example.com",
+    "password": "Password!23"
+  }'
+
+// Listing All USERS
+curl -X GET http://localhost:4000/v1/user \
+  -H "Authorization: Bearer 6f6dlLPjvPnJ2MK5UyavDQ"
+
+// Gettiing User Profile
+curl -X GET http://localhost:4000/v1/profile \
+  -H "Authorization: Bearer 6f6dlLPjvPnJ2MK5UyavDQ"
+
+// Creating a product
+curl -X POST http://localhost:4000/v1/products \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Laptop",
+    "price": 999.99
+  }'
+
+// Listing PRoducts
+curl -X GET http://localhost:4000/v1/products
+
+// Getting Produicts by IDS
+curl -X GET http://localhost:4000/v1/products/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+// Updating Prodcut
+curl -X PUT http://localhost:4000/v1/products/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Gaming Laptop",
+    "price": 1299.99
+  }'
+
+
+// Deleting Product
+curl -X DELETE http://localhost:4000/v1/products/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+
+// Creatomg Sa;e
+curl -X POST http://localhost:4000/v1/sales \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "product_id": 1,
+    "quantity": 2
+  }'
+
+// Listings sales
+curl -X GET http://localhost:4000/v1/sales
+
+//  Get Sale bny ID
+curl -X GET http://localhost:4000/v1/sales/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+// Updating Sale
+curl -X PUT http://localhost:4000/v1/sales/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "quantity": 3
+  }'
+
+// Filter Sales by user
+curl -X GET "http://localhost:4000/v1/sales?user_id=1"
+
+
+// filter sale by product
+curl -X GET "http://localhost:4000/v1/sales?product_id=1"

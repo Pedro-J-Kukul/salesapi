@@ -73,7 +73,7 @@ func (m *PermissionModel) GetAllForUser(user_id int64) (Permissions, error) {
 }
 
 // AssignPermissions - Assign a list of permissions to a specific role
-func (m *PermissionModel) AssignPermissions(roleID int64, codes Permissions) error {
+func (m *PermissionModel) AssignPermissions(userID int64, codes Permissions) error {
 	// Remove duplicate codes using slices
 	cleanCodes := slices.Compact(codes)
 
@@ -87,7 +87,32 @@ func (m *PermissionModel) AssignPermissions(roleID int64, codes Permissions) err
 	defer cancel()
 
 	// Execute the insert statement with the provided role ID and permission codes
-	result, err := m.DB.ExecContext(ctx, query, roleID, pq.Array(cleanCodes))
+	result, err := m.DB.ExecContext(ctx, query, userID, pq.Array(cleanCodes))
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrNoRecords
+	}
+
+	return nil
+}
+
+// clearPermissions - Remove all permissions associated with a specific user
+func (m *PermissionModel) ClearPermissions(userID int64) error {
+	query := `
+		DELETE FROM users_permissions
+		WHERE user_id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Execute the delete statement with the provided user ID
+	result, err := m.DB.ExecContext(ctx, query, userID)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
+	"github.com/lib/pq"
 )
 
 // ----------------------------------------------------------------------
@@ -62,6 +63,14 @@ func (m *ProductModel) Insert(product *Product) error {
 	defer cancel()
 
 	if err := m.DB.QueryRowContext(ctx, query, product.Name, product.Price).Scan(&product.ID, &product.CreatedAt, &product.UpdatedAt); err != nil {
+		if pqError, ok := err.(*pq.Error); ok {
+			switch pqError.Code {
+			case "23514": // check_violation
+				return ErrInvalidData
+			case "23502": // not_null_violation
+				return ErrInvalidData
+			}
+		}
 		return err
 	}
 	return nil

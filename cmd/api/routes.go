@@ -28,10 +28,11 @@ func (app *app) routes() http.Handler {
 	router.Handler(http.MethodGet, "/v1/metrics", expvar.Handler())
 
 	// Authentication and User Routes
-	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)                              // User Registration
-	router.HandlerFunc(http.MethodPut, "/v1/users/activate", app.activateUserHandler)                      // User Activation
-	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthenticationTokenHandler) // Login
-
+	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)                                                                            // User Registration
+	router.HandlerFunc(http.MethodPut, "/v1/users/activate", app.activateUserHandler)                                                                    // User Activation
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthenticationTokenHandler)                                               // Login
+	router.Handler(http.MethodDelete, "/v1/tokens/authentication", app.requireAuthenticatedUser(http.HandlerFunc(app.deleteAuthenticationTokenHandler))) // Logout
+	router.Handler(http.MethodPost, "/v1/chatbot", app.requireAuthenticatedUser(http.HandlerFunc(app.chatbotHandler)))
 	// Authenticated User Routes
 	router.Handler(http.MethodGet, "/v1/users/profile", app.requireAuthenticatedUser(http.HandlerFunc(app.showCurrentUserHandler))) // Get Authenticated User Info
 	router.Handler(http.MethodPut, "/v1/users/profile/:id", app.requireAuthenticatedUser(http.HandlerFunc(app.updateUserHandler)))  // Update Authenticated User Info

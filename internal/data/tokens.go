@@ -80,6 +80,11 @@ func (m *TokenModel) New(userID int64, ttl time.Duration, scope string) (*Token,
 	if err != nil {
 		return nil, err
 	}
+	// delete existing tokens for user and scope
+	err = m.DeleteAllForUser(scope, userID)
+	if err != nil {
+		return nil, err
+	}
 	err = m.Insert(token)
 	if err != nil {
 		return nil, err

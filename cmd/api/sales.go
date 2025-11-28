@@ -62,7 +62,10 @@ func (app *app) listSalesHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	v := validator.New()
 
-	SaleSafeList := []string{"id", "user_id", "product_id", "quantity", "sold_at"}
+	SaleSafeList := []string{
+		"id", "user_id", "product_id", "quantity", "sold_at",
+		"-id", "-user_id", "-product_id", "-quantity", "-sold_at",
+	}
 
 	filter := app.readFilters(query, "id", 20, SaleSafeList, v)
 	filters := data.SaleFilter{

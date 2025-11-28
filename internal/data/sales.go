@@ -141,17 +141,17 @@ func (m *SaleModel) Get(id int64) (*Sale, error) {
 // GetAll retrieves sales based on filtering criteria and pagination.
 func (m *SaleModel) GetAll(filter SaleFilter) ([]*Sale, MetaData, error) {
 	query := fmt.Sprintf(`
-		SELECT id, user_id, product_id, quantity, sold_at
-		FROM sales
-		WHERE (user_id = $1 OR $1 = 0)
-		  AND (product_id = $2 OR $2 = 0)
-		  AND (sold_at >= COALESCE(NULLIF($3, ''), sold_at))
-		  AND (sold_at <= COALESCE(NULLIF($4, ''), sold_at))
-		  AND (quantity >= $5 OR $5 = 0)
-		  AND (quantity <= $6 OR $6 = 0)
-		ORDER BY %s %s
-		LIMIT $7 OFFSET $8
-	`, filter.Filter.SortColumn(), filter.Filter.SortDirection())
+        SELECT COUNT(*) OVER(), id, user_id, product_id, quantity, sold_at
+        FROM sales
+        WHERE (user_id = $1 OR $1 = 0)
+          AND (product_id = $2 OR $2 = 0)
+          AND (CASE WHEN $3 = '' THEN TRUE ELSE sold_at >= $3::timestamp END)
+          AND (CASE WHEN $4 = '' THEN TRUE ELSE sold_at <= $4::timestamp END)
+          AND (quantity >= $5 OR $5 = 0)
+          AND (quantity <= $6 OR $6 = 0)
+        ORDER BY %s %s
+        LIMIT $7 OFFSET $8
+    `, filter.Filter.SortColumn(), filter.Filter.SortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -166,11 +166,10 @@ func (m *SaleModel) GetAll(filter SaleFilter) ([]*Sale, MetaData, error) {
 
 	for rows.Next() {
 		sale := &Sale{}
-		if err := rows.Scan(&sale.ID, &sale.UserID, &sale.ProductID, &sale.Quantity, &sale.SoldAt); err != nil {
+		if err := rows.Scan(&totalRecords, &sale.ID, &sale.UserID, &sale.ProductID, &sale.Quantity, &sale.SoldAt); err != nil {
 			return nil, MetaData{}, err
 		}
 		sales = append(sales, sale)
-		totalRecords++
 	}
 
 	if err := rows.Err(); err != nil {

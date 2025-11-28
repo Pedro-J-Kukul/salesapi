@@ -1,4 +1,4 @@
-// Filename /internal/data/errors.go
+// File: internal/data/errors.go
 package data
 
 import "errors"
@@ -11,4 +11,8 @@ var (
 	ErrNoRecords        = errors.New("no matching records found")
 	ErrDuplicateEmail   = errors.New("duplicate email")
 	ErrInsufficientCash = errors.New("insufficient cash provided")
+	ErrInvalidData      = errors.New("invalid data provided")
+	ErrInvalidRole      = errors.New("invalid role specified")
+	ErrAccountNotActive = errors.New("account is not active")
+	ErrInvalidToken     = errors.New("invalid or expired token")
 )

@@ -45,6 +45,9 @@ type config struct {
 		password string // SMTP password
 		sender   string // SMTP sender address
 	}
+	github struct {
+		token string // GitHub API token
+	}
 }
 
 type app struct {
@@ -125,6 +128,9 @@ func loadConfig() config {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")                                 // SMTP username
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")                                 // SMTP password
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Training <noreply@example.com>", "SMTP sender address") // SMTP sender address
+
+	// GitHub settings
+	flag.StringVar(&cfg.github.token, "github-token", "", "GitHub API token") // GitHub API token
 
 	flag.Parse() // parse the command-line flags
 

@@ -69,4 +69,5 @@ run:
 		-smtp-port=$(SMTP_PORT) \
 		-smtp-username=$(SMTP_USERNAME) \
 		-smtp-password=$(SMTP_PASSWORD) \
-		-smtp-sender=$(SMTP_SENDER)
+		-smtp-sender=$(SMTP_SENDER) \
+		-github-token=$(GITHUB_TOKEN)

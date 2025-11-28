@@ -5,10 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,22 +23,22 @@ import (
 
 // Password represents a hashed password.
 type Password struct {
-	hash      []byte  `db:"-"`
-	plaintext *string `db:"-"`
+	hash      []byte  `json:"-"`
+	plaintext *string `json:"-"`
 }
 
 // User represents a user in the system.
 type User struct {
-	ID        int64     `db:"id"`
-	FirstName string    `db:"first_name"`
-	LastName  string    `db:"last_name"`
-	Email     string    `db:"email"`
-	Password  Password  `db:"-"`
-	Role      string    `db:"role"`
-	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
-	IsActive  bool      `db:"is_active"`
-	Version   int       `db:"version"`
+	ID        int64     `json:"id"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	Email     string    `json:"email"`
+	Password  Password  `json:"-"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsActive  bool      `json:"is_active"`
+	Version   int       `json:"version"`
 }
 
 // UserModel wraps a sql.DB connection pool.
@@ -134,6 +137,12 @@ func (m *UserModel) Insert(user *User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	if user.Role == "" {
+		user.Role = "guest"
+	}
+
+	user.IsActive = false
+
 	err := m.DB.QueryRowContext(ctx, query,
 		user.FirstName,
 		user.LastName,
@@ -143,6 +152,19 @@ func (m *UserModel) Insert(user *User) error {
 		user.IsActive,
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt, &user.Version)
 	if err != nil {
+		// Handle PostgreSQL constraint violations
+		if pqError, ok := err.(*pq.Error); ok {
+			switch pqError.Code {
+			case "23505": // unique_violation
+				if strings.Contains(pqError.Detail, "email") {
+					return ErrDuplicateEmail
+				}
+			case "23514": // check_violation
+				return ErrInvalidData
+			case "23502": // not_null_violation
+				return ErrInvalidData
+			}
+		}
 		return err
 	}
 	return nil
@@ -171,7 +193,21 @@ func (m *UserModel) Update(user *User) error {
 		user.Version,
 	).Scan(&user.UpdatedAt, &user.Version)
 	if err != nil {
-		return err
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			// Handle PostgreSQL constraint violations
+			if pqError, ok := err.(*pq.Error); ok {
+				switch pqError.Code {
+				case "23505": // unique_violation
+					if strings.Contains(pqError.Detail, "email") {
+						return ErrDuplicateEmail
+					}
+				}
+			}
+			return err
+		}
 	}
 	return nil
 }

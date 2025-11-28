@@ -75,3 +75,23 @@ func (app *app) createAuthenticationTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 }
+
+// deleteAuthenticationTokenHandler handles the deletion of authentication tokens.
+func (app *app) deleteAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
+	// get user id from context
+	userID := app.contextGetUser(r).ID
+
+	// delete all authentication tokens for the user
+	err := app.models.Tokens.DeleteAllForUser(data.ScopeAuthentication, userID)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// send a success response
+	err = app.writeJSON(w, http.StatusOK, envelope{"message": "authentication tokens deleted successfully"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+}

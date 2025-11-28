@@ -74,9 +74,11 @@ func (m *PermissionModel) GetAllForUser(user_id int64) (Permissions, error) {
 
 // AssignPermissions - Assign a list of permissions to a specific role
 func (m *PermissionModel) AssignPermissions(roleID int64, codes Permissions) error {
-	// Prepare the SQL statement for inserting role-permission associations
+	// Remove duplicate codes using slices
+	cleanCodes := slices.Compact(codes)
+
 	query := `
-        INSERT INTO users_permissions (user_id, permission_id)
+		INSERT INTO users_permissions (user_id, permission_id)
 		SELECT $1, p.id
 		FROM permissions p
 		WHERE p.code = ANY($2)`
@@ -85,9 +87,16 @@ func (m *PermissionModel) AssignPermissions(roleID int64, codes Permissions) err
 	defer cancel()
 
 	// Execute the insert statement with the provided role ID and permission codes
-	_, err := m.DB.ExecContext(ctx, query, roleID, pq.Array(codes))
+	result, err := m.DB.ExecContext(ctx, query, roleID, pq.Array(cleanCodes))
 	if err != nil {
 		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrNoRecords
 	}
 
 	return nil

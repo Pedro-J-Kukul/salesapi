@@ -3,6 +3,6 @@
 CREATE TABLE IF NOT EXISTS "tokens" (
     "hash" bytea PRIMARY KEY,
     "user_id" BIGINT NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-    "scope" TEXT NOT NULL UNIQUE,
+    "scope" TEXT NOT NULL,
     "expires_at" TIMESTAMP NOT NULL
 );

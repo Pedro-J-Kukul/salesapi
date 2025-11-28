@@ -1,6 +1,6 @@
 # Makefile for managing database migrations and seeds using golang-migrate
 # Importing environment variables from .env file
-include .env
+include .envrc
 
 # PHONY targets
 .PHONY: migrate/create migrate/up migrate/down migrate/fix seed/create seed/up seed/down seed/fix run

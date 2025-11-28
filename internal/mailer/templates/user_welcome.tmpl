@@ -1,13 +1,13 @@
-// Filename: internal/mailer/templates/user_welcome.templates
+// Filename: internal/mailer/templates/user_welcome.tmpl
 // Description: email server template to send to new users
 
-{{ define "subject" }} Welcome to the Police Training System {{ end }}
+{{ define "subject" }} Welcome to ACM Sales Management System {{ end }}
 
 {{ define "plainBody" }}
 
 Hi,
 
-You have been registered as a user on the Police Training System.
+Welcome to the ACM Sales Management System!  You have been successfully registered as a user.
 
 Your login credentials are:
 Email: {{.userEmail}}
@@ -20,54 +20,102 @@ For your reference, your user ID number is {{.userID}}.
 Please send a request to the PUT /v1/users/activated endpoint with the following JSON body to activate your account:
 {"token": "{{.activationToken}}"}
 
-Please note that this is a one-time use token and it will expire in 3 days.
+Please note that this is a one-time use token and it will expire in 3 days. 
 
-If you have any questions or need assistance, please contact your system administrator.
+WHAT YOU CAN DO:
+- Manage products and inventory
+- Record and track sales transactions
+- Generate business analytics and reports
+- Use our AI-powered sales assistant
+
+ACCESS YOUR DASHBOARD:
+Once activated, you can log in to start managing sales, tracking inventory, and generating reports. 
+
+If you have any questions about using the sales system or need assistance, please contact your system administrator.
 
 Best regards,
-Police Training System Administration
+ACM Sales Team
+Sales Management System
 {{ end }}
 
 {{ define "htmlBody" }}
 
-<!doctype html>
+<! doctype html>
 <html>
 <head>
     <meta name="viewport" content="width=device-width" />
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <style>
+        . container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .credentials { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        . warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+        .activation { background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 15px 0; }
+        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; }
+        code { background-color: #f8f9fa; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
 </head>
 
 <body>
     <div class="container">
-        <h2>Welcome to the Police Training System</h2>
-        
-        <p>Hi, {{.firstName}} {{.lastName}}</p>
-        
-        <p>You have been registered as a user on the Police Training System.</p>
-        
-        <div class="credentials">
-            <h3>Your Login Credentials</h3>
-            <p><strong>Email:</strong> {{.email}}</p>
-            <p><strong>Password:</strong> {{.password}}</p>
+        <div class="header">
+            <h1>🏪 ACM Sales Management System</h1>
+            <p>Welcome to Your Sales Dashboard</p>
         </div>
         
-        <div class="warning">
-            <p><strong>⚠️ IMPORTANT:</strong> Please change your password after your first login for security purposes.</p>
+        <div class="content">
+            <h2>Hi there!  👋</h2>
+            
+            <p>Welcome to the ACM Sales Management System! You have been successfully registered as a user.</p>
+            
+            <div class="credentials">
+                <h3>🔐 Your Login Credentials</h3>
+                <p><strong>Email:</strong> {{.email}}</p>
+                <p><strong>Password:</strong> <code>{{.password}}</code></p>
+                <p><strong>User ID:</strong> {{.userID}}</p>
+            </div>
+            
+            <div class="warning">
+                <p><strong>⚠️ IMPORTANT:</strong> Please change your password after your first login for security purposes.</p>
+            </div>
+            
+            <div class="activation">
+                <h3>📧 Account Activation Required</h3>
+                <p>Please send a request to the <code>PUT /v1/users/activated</code> endpoint with the following JSON body to activate your account:</p>
+                
+                <pre><code>{"token": "{{.activationToken}}"}</code></pre>
+                
+                <p><strong>Note:</strong> This is a one-time use token and it will expire in 3 days.</p>
+            </div>
+            
+            <h3>🎯 What You Can Do</h3>
+            <ul>
+                <li><strong>🛍️ Product Management:</strong> Add, edit, and manage inventory</li>
+                <li><strong>💰 Sales Recording:</strong> Track customer transactions and sales</li>
+                <li><strong>📊 Business Analytics:</strong> Generate detailed reports and insights</li>
+                <li><strong>🤖 AI Assistant:</strong> Chat with our intelligent sales assistant</li>
+                <li><strong>📈 Performance Tracking:</strong> Monitor sales metrics and trends</li>
+            </ul>
+            
+            <h3>🚀 Get Started</h3>
+            <p>Once activated, you can log in to start:</p>
+            <ul>
+                <li>Managing sales and tracking inventory</li>
+                <li>Generating detailed business reports</li>
+                <li>Using our AI-powered sales assistant</li>
+                <li>Monitoring business performance metrics</li>
+            </ul>
+            
+            <p>If you have any questions about using the sales system or need assistance, please contact your system administrator.</p>
         </div>
         
-        <p>For your reference, your user ID number is <strong>{{.userID}}</strong>.</p>
-        
-        <h3>Account Activation</h3>
-        <p>Please send a request to the <code>PUT /v1/users/activated</code> endpoint with the following JSON body to activate your account:</p>
-        
-        <pre><code>{"token": "{{.activationToken}}"}</code></pre>
-        
-        <p><strong>Note:</strong> This is a one-time use token and it will expire in 3 days.</p>
-        
-        <p>If you have any questions or need assistance, please contact your system administrator.</p>
-        
-        <p>Best regards,<br>
-        <strong>Police Training System Administration</strong></p>
+        <div class="footer">
+            <p><strong>🏢 ACM Sales Team</strong><br>
+            Sales Management System<br>
+            <em>Empowering Your Sales Success</em></p>
+        </div>
     </div>
 </body>
 

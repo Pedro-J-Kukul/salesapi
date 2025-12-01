@@ -1,3 +1,5 @@
+// File cmd/api/main.go
+
 package main
 
 import (
@@ -18,6 +20,7 @@ import (
 	"github.com/Pedro-J-Kukul/salesapi/internal/mailer"
 )
 
+// Application version
 const version = "v0.3.0"
 
 // Server configuration settings
@@ -100,6 +103,7 @@ func main() {
 	}
 }
 
+// loadConfig loads configuration settings from command-line flags and environment variables.
 func loadConfig() config {
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")                                        // server port
@@ -176,6 +180,7 @@ func loadConfig() config {
 	return cfg // return the populated configuration
 }
 
+// setUpLogger sets up the structured logger with default fields.
 func setUpLogger(env string) *slog.Logger {
 	var logger *slog.Logger                                  // declare a logger variable
 	logger = slog.New(slog.NewTextHandler(os.Stdout, nil))   // default to text handler
@@ -183,6 +188,7 @@ func setUpLogger(env string) *slog.Logger {
 	return logger                                            // return the configured logger
 }
 
+// openDB opens a database connection pool and verifies the connection.
 func openDB(cfg config) (*sql.DB, error) {
 	db, err := sql.Open("postgres", cfg.db.dsn)
 	if err != nil {

@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:18-alpine
+    container_name: salesapi_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sales
+      POSTGRES_PASSWORD: sales
+      POSTGRES_DB: sales
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - salesapi_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sales -d sales" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Sales API Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: salesapi_app
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # Database
+      DB_DSN: "postgres://sales:sales@postgres:5432/sales?sslmode=disable"
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 25
+      DB_MAX_IDLE_TIME: "15m"
+
+      # Application
+      PORT: 4000
+      ENVIRONMENT: "development"
+
+      # CORS
+      CORS_TRUSTED_ORIGINS: "http://localhost:5173,http://localhost:9000"
+
+      # Rate Limiter
+      RATE_LIMITER_ENABLED: "true"
+      RATE_LIMITER_RPS: 5
+      RATE_LIMITER_BURST: 10
+
+      # SMTP (configure with your actual values)
+      SMTP_HOST: "sandbox.smtp.mailtrap.io"
+      SMTP_PORT: 2525
+      SMTP_USERNAME: ${SMTP_USERNAME:-username}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+      SMTP_SENDER: "SalesAPI <no-reply@sales.com>"
+
+      # GitHub Token for Chatbot (set in .env file)
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - salesapi_network
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 5 &&
+        echo 'Starting application...' &&
+        ./salesapi
+          -port=4000
+          -env=development
+          -db-dsn=postgres://sales:sales@postgres:5432/sales?sslmode=disable
+          -db-max-open-conns=25
+          -db-max-idle-conns=25
+          -db-max-idle-time=15m
+          -cors-trusted-origins='http://localhost:5173 http://localhost:9000'
+          -limiter-enabled=true
+          -limiter-rps=5
+          -limiter-burst=10
+          -smtp-host=${SMTP_HOST:-sandbox.smtp.mailtrap.io}
+          -smtp-port=${SMTP_PORT:-2525}
+          -smtp-username=${SMTP_USERNAME:-username}
+          -smtp-password=${SMTP_PASSWORD:-password}
+          -smtp-sender='SalesAPI <no-reply@sales.com>'
+          -github-token=${GITHUB_TOKEN:-}
+      "
+
+  # Migration tool (run manually)
+  migrate:
+    image: migrate/migrate:latest
+    container_name: salesapi_migrate
+    volumes:
+      - ./migrations:/migrations
+    networks:
+      - salesapi_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: [ "migrate", "-path", "/migrations", "-database", "postgres://sales:sales@postgres:5432/sales?sslmode=disable" ]
+    command: [ "up" ]
+    profiles:
+      - tools
+
+networks:
+  salesapi_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

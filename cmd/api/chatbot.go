@@ -8,6 +8,7 @@ import (
 	"github.com/Pedro-J-Kukul/salesapi/internal/validator"
 )
 
+// ChatbotHandler handles chatbot requests
 func (app *app) chatbotHandler(w http.ResponseWriter, r *http.Request) {
 	user := app.contextGetUser(r)
 	if user == nil {
